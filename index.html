@@ -346,100 +346,123 @@
       
         <p>在一些科研服务器、远程开发主机或高校实验平台中，我们经常遇到以下情况：</p>
 <ul>
-<li>❌ <strong>无法使用管理员权限</strong>，无法运行 <code>sudo</code>、安装系统级依赖或修改受限端口；</li>
-<li>🌐 开发过程中需要访问各类<strong>在线资源</strong>（如包管理平台、代码托管服务、远程 API 等）；</li>
-<li>🔒 <strong>不支持修改系统服务</strong>（如 <code>systemd</code>、<code>/etc/hosts</code>、<code>iptables</code> 等）；</li>
+<li>❌ <strong>无法使用管理员权限</strong>，无法运行 <code>sudo</code>、安装系统级依赖或修改受限端口；  </li>
+<li>🌐 开发过程中需要访问各类<strong>在线资源</strong>（如包管理平台、代码托管服务、远程 API 等）；  </li>
+<li>🔒 <strong>不支持修改系统服务</strong>（如 <code>systemd</code>、<code>/etc/hosts</code>、<code>iptables</code> 等）。</li>
 </ul>
-<p>那有没有办法，<strong>完全在用户目录中部署本地网络访问优化工具</strong>，让 CLI 工具（如 <code>pip</code> &#x2F; <code>curl</code> &#x2F; <code>git</code> 等）顺利运行？</p>
-<p>✅ 答案是肯定的。本文将介绍一种基于 Clash 的用户空间代理配置方法，适用于 Linux 平台，无需 root 权限、不改动系统配置，非常适合以下场景：</p>
+<p>那么，有没有办法<strong>完全在用户目录中部署本地网络访问优化工具</strong>，让 <code>pip</code>、<code>curl</code>、<code>git</code> 等 CLI 工具都能顺利联网？  </p>
+<p>✅ 答案是肯定的。本文介绍一种基于 <strong>Clash</strong> 的用户空间代理配置方法，适用于 Linux 平台：  </p>
 <ul>
-<li>科研实验平台</li>
-<li>自动构建与 CI&#x2F;CD 流程</li>
-<li>云端远程开发环境</li>
+<li><strong>无需 root 权限</strong>  </li>
+<li><strong>不修改系统配置</strong>  </li>
+<li><strong>仅依赖用户目录可写权限</strong></li>
 </ul>
+<p>非常适合以下场景：科研实验平台、CI&#x2F;CD 构建流程、云端远程开发环境。  </p>
 <hr>
-<h2 id="🛠-一、将代理工具部署到用户目录"><a href="#🛠-一、将代理工具部署到用户目录" class="headerlink" title="🛠 一、将代理工具部署到用户目录"></a>🛠 一、将代理工具部署到用户目录</h2><p>首先，我们将代理程序解压到 <code>~/opt/clash</code>，保持对系统目录的零侵入：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">mkdir</span> -p ~/opt/clash &amp;&amp; <span class="built_in">cd</span> ~/opt/clash</span><br><span class="line"></span><br><span class="line"><span class="comment"># 示例：下载一份预编译二进制程序（请替换为可信来源）</span></span><br><span class="line">wget wget https://github.com/vernesong/OpenClash/raw/2d53dcac0a3c28151eac5537d8b97c918d916c28/dev/premium/clash-linux-amd64-2023.08.17-11-g0f901d0.gz</span><br><span class="line">gunzip ~/opt/clash/clash-linux-amd64-2023.08.17-11-g0f901d0.gz</span><br><span class="line"><span class="built_in">chmod</span> +x ~/opt/clash/clash-linux-amd64-2023.08.17-11-g0f901d0</span><br></pre></td></tr></table></figure>
+<h2 id="🛠-一、将代理工具部署到用户目录"><a href="#🛠-一、将代理工具部署到用户目录" class="headerlink" title="🛠 一、将代理工具部署到用户目录"></a>🛠 一、将代理工具部署到用户目录</h2><p>首先，我们将代理程序解压到 <code>~/opt/clash</code>，保证对系统目录零侵入：  </p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">mkdir</span> -p ~/opt/clash &amp;&amp; <span class="built_in">cd</span> ~/opt/clash</span><br><span class="line"></span><br><span class="line"><span class="comment"># 示例：下载一份预编译二进制程序（请替换为可信来源）</span></span><br><span class="line">wget https://github.com/vernesong/OpenClash/raw/2d53dcac0a3c28151eac5537d8b97c918d916c28/dev/premium/clash-linux-amd64-2023.08.17-11-g0f901d0.gz</span><br><span class="line">gunzip clash-linux-amd64-2023.08.17-11-g0f901d0.gz</span><br><span class="line"><span class="built_in">chmod</span> +x clash-linux-amd64-2023.08.17-11-g0f901d0</span><br><span class="line">````</span><br><span class="line"></span><br><span class="line">📌 **小提示**</span><br><span class="line"></span><br><span class="line">* 不同架构需下载对应版本（如 `arm64`）。</span><br><span class="line">* 建议将二进制文件改名为 `clash`，方便调用：</span><br><span class="line"></span><br><span class="line">  ```bash</span><br><span class="line">  <span class="built_in">mv</span> clash-linux-amd64-2023.08.17-11-g0f901d0 clash</span><br></pre></td></tr></table></figure>
 
 <hr>
-<h2 id="🧩-二、准备配置文件"><a href="#🧩-二、准备配置文件" class="headerlink" title="🧩 二、准备配置文件"></a>🧩 二、准备配置文件</h2><p>Clash 使用 YAML 格式的配置文件。我们将其保存在用户配置路径中：</p>
+<h2 id="🧩-二、准备配置文件"><a href="#🧩-二、准备配置文件" class="headerlink" title="🧩 二、准备配置文件"></a>🧩 二、准备配置文件</h2><p>Clash 使用 <strong>YAML 格式</strong>配置文件。我们将其保存在 <code>~/.config/clash/config.yaml</code>：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">mkdir</span> -p ~/.config/clash</span><br><span class="line">nano ~/.config/clash/config.yaml</span><br></pre></td></tr></table></figure>
 
 <blockquote>
-<p>⚠️ 以下为示例配置结构，请根据实际情况填写连接信息和规则策略，仅用于调试和学习用途。</p>
+<p>⚠️ 以下仅为示例配置，请根据实际订阅信息、代理节点和规则策略填写。</p>
 </blockquote>
-<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">mixed-port:</span> <span class="number">7890</span>       <span class="comment"># 本地监听端口</span></span><br><span class="line"><span class="attr">allow-lan:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">bind-address:</span> <span class="string">&#x27;*&#x27;</span></span><br><span class="line"><span class="attr">mode:</span> <span class="string">rule</span>             <span class="comment"># 可选：rule / global / direct</span></span><br><span class="line"><span class="attr">log-level:</span> <span class="string">info</span></span><br><span class="line"><span class="attr">external-controller:</span> <span class="string">&#x27;127.0.0.1:10086&#x27;</span></span><br><span class="line"><span class="comment"># proxies: ...</span></span><br><span class="line"><span class="comment"># proxy-groups: ...</span></span><br><span class="line"><span class="comment"># rules: ...</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">mixed-port:</span> <span class="number">7890</span>       <span class="comment"># 本地监听端口</span></span><br><span class="line"><span class="attr">allow-lan:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">bind-address:</span> <span class="string">&#x27;*&#x27;</span></span><br><span class="line"><span class="attr">mode:</span> <span class="string">rule</span>             <span class="comment"># 可选：rule / global / direct</span></span><br><span class="line"><span class="attr">log-level:</span> <span class="string">info</span></span><br><span class="line"><span class="attr">external-controller:</span> <span class="string">&#x27;127.0.0.1:10086&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="attr">proxies:</span></span><br><span class="line">  <span class="bullet">-</span> &#123; <span class="attr">name:</span> <span class="string">&quot;Proxy1&quot;</span>, <span class="attr">type:</span> <span class="string">socks5</span>, <span class="attr">server:</span> <span class="number">1.2</span><span class="number">.3</span><span class="number">.4</span>, <span class="attr">port:</span> <span class="number">1080</span> &#125;</span><br><span class="line"></span><br><span class="line"><span class="attr">proxy-groups:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">&quot;AUTO&quot;</span></span><br><span class="line">    <span class="attr">type:</span> <span class="string">select</span></span><br><span class="line">    <span class="attr">proxies:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">Proxy1</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">DIRECT</span></span><br><span class="line"></span><br><span class="line"><span class="attr">rules:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">DOMAIN-SUFFIX,github.com,AUTO</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">DOMAIN-SUFFIX,pypi.org,AUTO</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">DOMAIN-SUFFIX,google.com,AUTO</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">MATCH,DIRECT</span></span><br></pre></td></tr></table></figure>
 
+<p>📌 <strong>小提示</strong></p>
+<ul>
+<li>如果有 Clash 订阅链接，可以直接用 <code>clash</code> 的 <code>config.yaml</code> 替换。</li>
+<li>推荐把配置文件和订阅文件放在 <code>~/.config/clash/</code> 下，方便管理。</li>
+</ul>
 <hr>
-<h2 id="🌍-三、配置环境变量支持-CLI-工具联网"><a href="#🌍-三、配置环境变量支持-CLI-工具联网" class="headerlink" title="🌍 三、配置环境变量支持 CLI 工具联网"></a>🌍 三、配置环境变量支持 CLI 工具联网</h2><p>在 <code>~/.bashrc</code> 或 <code>~/.zshrc</code> 中添加如下内容：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">nano ~/.bashrc</span><br><span class="line"></span><br><span class="line"><span class="built_in">export</span> HTTP_PROXY=http://127.0.0.1:7890</span><br><span class="line"><span class="built_in">export</span> HTTPS_PROXY=http://127.0.0.1:7890</span><br></pre></td></tr></table></figure>
+<h2 id="🌍-三、配置环境变量支持-CLI-工具联网"><a href="#🌍-三、配置环境变量支持-CLI-工具联网" class="headerlink" title="🌍 三、配置环境变量支持 CLI 工具联网"></a>🌍 三、配置环境变量支持 CLI 工具联网</h2><p>在 <code>~/.bashrc</code> 或 <code>~/.zshrc</code> 中添加以下内容：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">export</span> HTTP_PROXY=http://127.0.0.1:7890</span><br><span class="line"><span class="built_in">export</span> HTTPS_PROXY=http://127.0.0.1:7890</span><br></pre></td></tr></table></figure>
 
-<p>然后执行：</p>
+<p>生效方式：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">source</span> ~/.bashrc  <span class="comment"># 或 source ~/.zshrc</span></span><br></pre></td></tr></table></figure>
 
-<p>这样，<code>pip</code>、<code>curl</code>、<code>git</code> 等命令会默认通过本地代理端口进行访问。</p>
+<p>这样，<code>pip</code>、<code>curl</code>、<code>git</code> 等命令会默认通过本地代理端口转发。</p>
 <hr>
-<h2 id="🚀-四、启动本地代理服务"><a href="#🚀-四、启动本地代理服务" class="headerlink" title="🚀 四、启动本地代理服务"></a>🚀 四、启动本地代理服务</h2><p>可以选择前台调试或后台运行：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 前台运行（查看输出日志）</span></span><br><span class="line">~/opt/clash/~/opt/clash/clash-linux-amd64-2023.08.17-11-g0f901d0-2023.08.17-11-g0f901d0</span><br><span class="line"><span class="comment"># 后台运行（推荐方式）</span></span><br><span class="line"><span class="built_in">nohup</span> ~/opt/clash/~/opt/clash/clash-linux-amd64-2023.08.17-11-g0f901d0 -d ~/.config/clash &gt; ~/clash.log 2&gt;&amp;1 &amp;</span><br></pre></td></tr></table></figure>
+<h2 id="🚀-四、启动本地代理服务"><a href="#🚀-四、启动本地代理服务" class="headerlink" title="🚀 四、启动本地代理服务"></a>🚀 四、启动本地代理服务</h2><h3 id="方式一：前台运行（调试用）"><a href="#方式一：前台运行（调试用）" class="headerlink" title="方式一：前台运行（调试用）"></a>方式一：前台运行（调试用）</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">~/opt/clash/clash -d ~/.config/clash</span><br><span class="line">````</span><br><span class="line"></span><br><span class="line"><span class="comment">### 方式二：后台运行（推荐）</span></span><br><span class="line"></span><br><span class="line">```bash</span><br><span class="line"><span class="built_in">nohup</span> ~/opt/clash/clash -d ~/.config/clash &gt; ~/clash.log 2&gt;&amp;1 &amp;</span><br></pre></td></tr></table></figure>
 
-<p>代理程序启动后会监听本地端口（如 7890）并负责转发流量。</p>
+<p>运行后，Clash 会监听本地端口（如 <code>7890</code>），并根据规则转发流量。</p>
+<hr>
+<h3 id="⚠️-常见启动报错：Country-mmdb-下载失败"><a href="#⚠️-常见启动报错：Country-mmdb-下载失败" class="headerlink" title="⚠️ 常见启动报错：Country.mmdb 下载失败"></a>⚠️ 常见启动报错：Country.mmdb 下载失败</h3><p>首次运行时，如果出现类似报错：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">can&#x27;t initial MMDB: can&#x27;t download MMDB:</span><br><span class="line">Get &quot;https://cdn.jsdelivr.net/.../Country.mmdb&quot;: proxyconnect tcp: dial tcp 127.0.0.1:7890: connect: connection refused</span><br></pre></td></tr></table></figure>
+
+<p>这是因为 Clash 默认会尝试下载 <strong>GeoIP 数据库 (<code>Country.mmdb</code>)</strong>，但此时代理尚未建立，导致“套娃”失败。</p>
+<h4 id="🔧-解决方法："><a href="#🔧-解决方法：" class="headerlink" title="🔧 解决方法："></a>🔧 解决方法：</h4><ol>
+<li><p><strong>手动下载文件</strong>（推荐）</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">wget -O ~/.config/clash/Country.mmdb \</span><br><span class="line">https://cdn.jsdelivr.net/gh/Dreamacro/maxmind-geoip@release/Country.mmdb</span><br></pre></td></tr></table></figure>
+
+<p>或备用源：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">wget -O ~/.config/clash/Country.mmdb \</span><br><span class="line">https://raw.githubusercontent.com/Dreamacro/maxmind-geoip/release/Country.mmdb</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>重新启动 Clash</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">~/opt/clash/clash -d ~/.config/clash</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>（可选）关闭 GeoIP 规则</strong><br>如果你不需要基于地区的规则，可以在 <code>config.yaml</code> 中删除 <code>GEOIP</code> 相关条目，或设置：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">geodata-mode:</span> <span class="literal">true</span></span><br></pre></td></tr></table></figure>
+
+<p>这样 Clash 就不会尝试下载 <code>Country.mmdb</code>。</p>
+</li>
+</ol>
+<hr>
+<p>📌 建议：只需手动下载一次 <code>Country.mmdb</code>，后续启动不会再报错。</p>
 <hr>
 <h2 id="🧪-五、验证是否生效"><a href="#🧪-五、验证是否生效" class="headerlink" title="🧪 五、验证是否生效"></a>🧪 五、验证是否生效</h2><ol>
-<li>检查本地端口监听情况：</li>
+<li>检查端口监听：</li>
 </ol>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">netstat -tunlp | grep 7890</span><br></pre></td></tr></table></figure>
 
 <ol start="2">
-<li>使用 <code>curl</code> 测试是否可达：</li>
+<li>使用 <code>curl</code> 测试：</li>
 </ol>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -I https://www.example.com</span><br></pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -I https://www.google.com</span><br></pre></td></tr></table></figure>
 
-<p>若返回 HTTP 响应头而非超时，说明配置生效。</p>
+<p>若返回 HTTP 响应头而非超时，说明配置已生效。</p>
 <hr>
-<h2 id="🔄-六、无管理员权限下常见问题解决"><a href="#🔄-六、无管理员权限下常见问题解决" class="headerlink" title="🔄 六、无管理员权限下常见问题解决"></a>🔄 六、无管理员权限下常见问题解决</h2><h3 id="✅-端口冲突"><a href="#✅-端口冲突" class="headerlink" title="✅ 端口冲突"></a>✅ 端口冲突</h3><p>如遇到端口 7890 被占用，可以修改为其他高位端口：</p>
+<h2 id="🔄-六、无管理员权限下常见问题解决"><a href="#🔄-六、无管理员权限下常见问题解决" class="headerlink" title="🔄 六、无管理员权限下常见问题解决"></a>🔄 六、无管理员权限下常见问题解决</h2><h3 id="1-✅-端口冲突"><a href="#1-✅-端口冲突" class="headerlink" title="1. ✅ 端口冲突"></a>1. ✅ 端口冲突</h3><p>如遇 <code>7890</code> 被占用，可修改为高位端口：</p>
 <figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">mixed-port:</span> <span class="number">17980</span></span><br><span class="line"><span class="attr">external-controller:</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span><span class="string">:18086</span></span><br></pre></td></tr></table></figure>
 
 <p>同时更新环境变量：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">export</span> HTTP_PROXY=http://127.0.0.1:17980</span><br><span class="line"><span class="built_in">export</span> HTTPS_PROXY=http://127.0.0.1:17980</span><br></pre></td></tr></table></figure>
 
 <hr>
-<h3 id="✅-启动自动化（无-systemd-权限）"><a href="#✅-启动自动化（无-systemd-权限）" class="headerlink" title="✅ 启动自动化（无 systemd 权限）"></a>✅ 启动自动化（无 systemd 权限）</h3><p>无法使用 <code>systemctl</code> 的用户环境中，可以借助 <code>crontab</code>：</p>
+<h3 id="2-✅-启动自动化（无-systemd-权限）"><a href="#2-✅-启动自动化（无-systemd-权限）" class="headerlink" title="2. ✅ 启动自动化（无 systemd 权限）"></a>2. ✅ 启动自动化（无 systemd 权限）</h3><p>无法使用 <code>systemctl</code> 的用户，可借助 <code>crontab</code>：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">crontab -e</span><br></pre></td></tr></table></figure>
 
-<p>添加以下行，实现开机自动运行：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">@reboot /home/你的用户名/opt/clash/~/opt/clash/clash-linux-amd64-2023.08.17-11-g0f901d0 -d /home/你的用户名/.config/clash</span><br></pre></td></tr></table></figure>
+<p>添加以下行，实现开机自启：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">@reboot /home/你的用户名/opt/clash/clash -d /home/你的用户名/.config/clash</span><br></pre></td></tr></table></figure>
 
 <hr>
 <h2 id="🧯-七、常见排查方式"><a href="#🧯-七、常见排查方式" class="headerlink" title="🧯 七、常见排查方式"></a>🧯 七、常见排查方式</h2><ul>
-<li><strong>查看运行日志：</strong></li>
-</ul>
+<li><p><strong>查看运行日志</strong></p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">tail</span> -f ~/clash.log</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li><strong>强制终止程序：</strong></li>
-</ul>
+</li>
+<li><p><strong>强制终止程序</strong></p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pkill -f <span class="string">&quot;clash -d&quot;</span></span><br></pre></td></tr></table></figure>
-
-<ul>
-<li><strong>检查配置文件合法性：</strong></li>
+</li>
+<li><p><strong>测试配置合法性</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">~/opt/clash/clash -t -d ~/.config/clash</span><br></pre></td></tr></table></figure></li>
 </ul>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">~/opt/clash/~/opt/clash/clash-linux-amd64-2023.08.17-11-g0f901d0 -t -d ~/.config/clash</span><br></pre></td></tr></table></figure>
-
 <hr>
-<h2 id="🧠-八、网络请求代理流程示意图（用户空间）"><a href="#🧠-八、网络请求代理流程示意图（用户空间）" class="headerlink" title="🧠 八、网络请求代理流程示意图（用户空间）"></a>🧠 八、网络请求代理流程示意图（用户空间）</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">CLI 工具或本地应用</span><br><span class="line">    ↓ 发起网络请求</span><br><span class="line">通过 HTTP_PROXY / HTTPS_PROXY 环境变量转发</span><br><span class="line">    ↓</span><br><span class="line">127.0.0.1:7890 （本地监听端口）</span><br><span class="line">    ↓</span><br><span class="line">用户进程运行的代理程序</span><br><span class="line">    ↓</span><br><span class="line">转发到远端资源节点（按配置规则）</span><br></pre></td></tr></table></figure>
+<h2 id="🧠-八、网络请求代理流程示意图（用户空间）"><a href="#🧠-八、网络请求代理流程示意图（用户空间）" class="headerlink" title="🧠 八、网络请求代理流程示意图（用户空间）"></a>🧠 八、网络请求代理流程示意图（用户空间）</h2><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">CLI 工具或本地应用</span><br><span class="line">    ↓ 发起网络请求</span><br><span class="line">通过 HTTP_PROXY / HTTPS_PROXY 环境变量转发</span><br><span class="line">    ↓</span><br><span class="line">127.0.0.1:7890 （本地监听端口）</span><br><span class="line">    ↓</span><br><span class="line">用户进程运行的 Clash 程序</span><br><span class="line">    ↓</span><br><span class="line">转发到远端代理节点（按配置规则）</span><br></pre></td></tr></table></figure>
 
-<p>你可以将其理解为：</p>
+<p>可以理解为：</p>
 <blockquote>
-<p>“一切发起的网络请求先交给你自己本地的转发程序，由它负责转交出去”。</p>
+<p>“所有网络请求先交给你本地的转发程序，由它决定如何发送出去”。</p>
 </blockquote>
 <hr>
-<h2 id="✅-总结"><a href="#✅-总结" class="headerlink" title="✅ 总结"></a>✅ 总结</h2><p>本方案适用于以下情况：</p>
+<h2 id="✅-总结"><a href="#✅-总结" class="headerlink" title="✅ 总结"></a>✅ 总结</h2><p>本方案适用于：</p>
 <ul>
 <li>无管理员权限（如 root）；</li>
-<li>无法修改系统配置（如系统服务、防火墙）；</li>
-<li>需要改善命令行工具访问网络的稳定性和速度；</li>
+<li>无法修改系统配置（如防火墙、系统服务）；</li>
+<li>需要改善命令行工具联网体验的场景。</li>
 </ul>
-<p><strong>通过用户空间部署本地代理机制，依然可以获得流畅稳定的网络访问体验。</strong></p>
+<p><strong>通过用户空间部署 Clash 代理，即使在受限环境下，依然可以获得稳定、流畅的网络访问体验。</strong></p>
 
       
     </div>
@@ -448,7 +471,7 @@
       
       
       
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E7%BD%91%E7%BB%9C/" rel="tag">网络</a></li></ul>
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Clash/" rel="tag">Clash</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Linux/" rel="tag">Linux</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E4%BB%A3%E7%90%86/" rel="tag">代理</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E7%BD%91%E7%BB%9C/" rel="tag">网络</a></li></ul>
 
     </footer>
   </div>
@@ -471,7 +494,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E4%BA%BA%E7%94%9F%E6%84%9F%E6%82%9F/" rel="tag">人生感悟</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%8D%9A%E5%AE%A2/" rel="tag">博客</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%80%9D%E8%80%83/" rel="tag">思考</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%88%90%E9%95%BF/" rel="tag">成长</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%84%A6%E8%99%91/" rel="tag">焦虑</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%88%B1%E6%83%85/" rel="tag">爱情</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%BD%91%E7%BB%9C/" rel="tag">网络</a></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Clash/" rel="tag">Clash</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E4%BA%BA%E7%94%9F%E6%84%9F%E6%82%9F/" rel="tag">人生感悟</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E4%BB%A3%E7%90%86/" rel="tag">代理</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%8D%9A%E5%AE%A2/" rel="tag">博客</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%80%9D%E8%80%83/" rel="tag">思考</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%88%90%E9%95%BF/" rel="tag">成长</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%84%A6%E8%99%91/" rel="tag">焦虑</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%88%B1%E6%83%85/" rel="tag">爱情</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%BD%91%E7%BB%9C/" rel="tag">网络</a></li></ul>
     </div>
   </div>
 
@@ -481,7 +504,7 @@
   <div class="widget-wrap">
     <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/tags/Hexo/" style="font-size: 10px;">Hexo</a> <a href="/tags/%E4%BA%BA%E7%94%9F%E6%84%9F%E6%82%9F/" style="font-size: 10px;">人生感悟</a> <a href="/tags/%E5%8D%9A%E5%AE%A2/" style="font-size: 10px;">博客</a> <a href="/tags/%E6%80%9D%E8%80%83/" style="font-size: 10px;">思考</a> <a href="/tags/%E6%88%90%E9%95%BF/" style="font-size: 10px;">成长</a> <a href="/tags/%E7%84%A6%E8%99%91/" style="font-size: 10px;">焦虑</a> <a href="/tags/%E7%88%B1%E6%83%85/" style="font-size: 10px;">爱情</a> <a href="/tags/%E7%BD%91%E7%BB%9C/" style="font-size: 10px;">网络</a>
+      <a href="/tags/Clash/" style="font-size: 10px;">Clash</a> <a href="/tags/Hexo/" style="font-size: 10px;">Hexo</a> <a href="/tags/Linux/" style="font-size: 10px;">Linux</a> <a href="/tags/%E4%BA%BA%E7%94%9F%E6%84%9F%E6%82%9F/" style="font-size: 10px;">人生感悟</a> <a href="/tags/%E4%BB%A3%E7%90%86/" style="font-size: 10px;">代理</a> <a href="/tags/%E5%8D%9A%E5%AE%A2/" style="font-size: 10px;">博客</a> <a href="/tags/%E6%80%9D%E8%80%83/" style="font-size: 10px;">思考</a> <a href="/tags/%E6%88%90%E9%95%BF/" style="font-size: 10px;">成长</a> <a href="/tags/%E7%84%A6%E8%99%91/" style="font-size: 10px;">焦虑</a> <a href="/tags/%E7%88%B1%E6%83%85/" style="font-size: 10px;">爱情</a> <a href="/tags/%E7%BD%91%E7%BB%9C/" style="font-size: 10px;">网络</a>
     </div>
   </div>
 
